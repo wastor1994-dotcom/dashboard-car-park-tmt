@@ -43,7 +43,11 @@ function formatTime(iso) {
 function applySnapshot(snapshot) {
   state.snapshot = snapshot;
   els.statTotal.textContent = snapshot?.meta?.total ?? 0;
-  els.statFile.textContent = snapshot?.fileName || '—';
+  const sheetId = snapshot?.spreadsheetId;
+  if (sheetId && els.statFile) {
+    els.statFile.href = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing`;
+    els.statFile.textContent = 'ไฟล์ข้อมูล';
+  }
   els.statSheet.textContent = snapshot?.sheetName || 'DATA';
   els.updatedAt.textContent = `อัปเดตล่าสุด ${formatTime(snapshot?.updatedAt)}`;
 }
