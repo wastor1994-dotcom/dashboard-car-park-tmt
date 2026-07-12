@@ -345,7 +345,6 @@ function renderHome() {
   nav.appendChild(
     choiceButton({
       label: 'ประเภทรถ',
-      count: total,
       primary: true,
       onClick: () => {
         clearHomeNav();
@@ -357,7 +356,6 @@ function renderHome() {
   nav.appendChild(
     choiceButton({
       label: 'ประเภทลานจอด',
-      count: state.snapshot?.meta?.parkingLots?.length,
       primary: true,
       onClick: () => {
         clearHomeNav();
