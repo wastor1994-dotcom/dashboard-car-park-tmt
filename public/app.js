@@ -275,7 +275,7 @@ function choiceButton({ label, count, primary = false, onClick }) {
 }
 
 function clearHomeNav() {
-  els.btnGrid.parentElement?.querySelectorAll('.home-nav').forEach((el) => el.remove());
+  els.btnGrid.parentElement?.querySelectorAll('.home-nav, .home-charts').forEach((el) => el.remove());
 }
 
 function renderHome() {
@@ -344,7 +344,7 @@ function renderHome() {
   nav.className = 'home-nav';
   nav.appendChild(
     choiceButton({
-      label: 'ดูตามประเภทรถ / ยี่ห้อ',
+      label: 'ประเภทรถ',
       count: total,
       primary: true,
       onClick: () => {
@@ -356,7 +356,7 @@ function renderHome() {
   );
   nav.appendChild(
     choiceButton({
-      label: 'ดูตามลานจอด',
+      label: 'ประเภทลานจอด',
       count: state.snapshot?.meta?.parkingLots?.length,
       primary: true,
       onClick: () => {
@@ -367,6 +367,126 @@ function renderHome() {
     }),
   );
   els.btnGrid.after(nav);
+
+  const charts = document.createElement('div');
+  charts.className = 'home-charts';
+  charts.innerHTML = buildHomeChartsHtml();
+  nav.after(charts);
+  requestAnimationFrame(() => animateHomeCharts(charts));
+}
+
+const CHART_COLORS = {
+  'รถยนต์': '#1f7a7a',
+  'มอร์เตอร์ไซต์': '#e67e22',
+  'ไม่มีประเภทรถ': '#6c757d',
+  'มีสติ๊กเกอร์': '#27ae60',
+  'ไม่มีสติ๊กเกอร์': '#e74c3c',
+};
+
+function buildHomeChartsHtml() {
+  const types = (state.snapshot?.meta?.vehicleTypes || []).map((t) => ({
+    name: displayVehicleType(t.name),
+    count: t.count,
+    color: CHART_COLORS[t.name] || '#6fd4a8',
+  }));
+  const stickers = (state.snapshot?.meta?.parkingStatus || []).map((t) => ({
+    name: t.name,
+    count: t.count,
+    color: CHART_COLORS[t.name] || '#6fd4a8',
+  }));
+  const lots = (state.snapshot?.meta?.parkingLots || []).slice(0, 8);
+
+  return `
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>สัดส่วนประเภทรถ</h3>
+        <div class="chart-body">
+          ${donutChartSvg(types)}
+          ${chartLegend(types)}
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>สัดส่วนสติ๊กเกอร์</h3>
+        <div class="chart-body">
+          ${donutChartSvg(stickers)}
+          ${chartLegend(stickers)}
+        </div>
+      </div>
+      <div class="chart-card chart-card-wide">
+        <h3>จำนวนรถตามลานจอด</h3>
+        ${barChartHtml(lots)}
+      </div>
+    </div>
+  `;
+}
+
+function chartLegend(items) {
+  const total = items.reduce((s, i) => s + i.count, 0) || 1;
+  return `<ul class="chart-legend">${items
+    .map((i) => {
+      const pct = Math.round((i.count / total) * 100);
+      return `<li><span class="swatch" style="background:${i.color}"></span>
+        <span>${escapeHtml(i.name)}</span>
+        <strong>${i.count.toLocaleString('th-TH')} (${pct}%)</strong></li>`;
+    })
+    .join('')}</ul>`;
+}
+
+function donutChartSvg(items) {
+  const total = items.reduce((s, i) => s + i.count, 0);
+  if (!total) {
+    return `<div class="empty">ไม่มีข้อมูล</div>`;
+  }
+  const r = 54;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  const segments = items
+    .filter((i) => i.count > 0)
+    .map((i) => {
+      const len = (i.count / total) * c;
+      const seg = `<circle class="donut-seg" cx="70" cy="70" r="${r}" fill="transparent"
+        stroke="${i.color}" stroke-width="22"
+        stroke-dasharray="${len} ${c - len}"
+        stroke-dashoffset="${-offset}"
+        transform="rotate(-90 70 70)"></circle>`;
+      offset += len;
+      return seg;
+    })
+    .join('');
+
+  return `<div class="donut-wrap">
+    <svg viewBox="0 0 140 140" class="donut" aria-hidden="true">
+      <circle cx="70" cy="70" r="${r}" fill="transparent" stroke="rgba(255,255,255,0.08)" stroke-width="22"></circle>
+      ${segments}
+      <text x="70" y="66" text-anchor="middle" class="donut-total">${total.toLocaleString('th-TH')}</text>
+      <text x="70" y="84" text-anchor="middle" class="donut-sub">คัน</text>
+    </svg>
+  </div>`;
+}
+
+function barChartHtml(lots) {
+  if (!lots.length) return `<p class="empty">ไม่มีข้อมูลลานจอด</p>`;
+  const max = Math.max(...lots.map((l) => l.count), 1);
+  return `<div class="lot-bars">${lots
+    .map((l) => {
+      const pct = Math.round((l.count / max) * 100);
+      return `<div class="lot-bar-row">
+        <span class="lot-name">${escapeHtml(l.name)}</span>
+        <div class="lot-track"><div class="lot-fill" style="--w:${pct}%"></div></div>
+        <strong class="lot-count">${l.count.toLocaleString('th-TH')}</strong>
+      </div>`;
+    })
+    .join('')}</div>`;
+}
+
+function animateHomeCharts(root) {
+  root.querySelectorAll('.lot-fill').forEach((el) => {
+    const w = el.style.getPropertyValue('--w') || '0%';
+    el.style.width = '0';
+    requestAnimationFrame(() => {
+      el.style.width = w.trim();
+    });
+  });
 }
 
 function renderVehicleTypes() {
