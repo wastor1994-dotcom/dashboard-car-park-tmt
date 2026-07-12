@@ -270,16 +270,18 @@ function choiceButton({ label, count, primary = false, onClick }) {
   return btn;
 }
 
-function clearHomeNav() {
-  els.btnGrid.parentElement?.querySelectorAll('.home-nav, .home-charts').forEach((el) => el.remove());
+function showPanelDesc(text) {
+  els.panelDesc.hidden = false;
+  els.panelDesc.textContent = text;
 }
 
 function renderHome() {
   clearHomeNav();
   const head = document.querySelector('.panel-head');
   head?.classList.add('banner');
-  els.panelTitle.textContent = 'Dashboard สรุปข้อมูลรถและลานจอด';
-  els.panelDesc.textContent = 'คลิกการ์ดเพื่อดูรายละเอียด';
+  els.panelTitle.textContent = 'Dashboard';
+  els.panelDesc.textContent = '';
+  els.panelDesc.hidden = true;
   els.btnGrid.innerHTML = '';
   els.btnGrid.className = 'kpi-grid';
   els.summary.classList.add('hidden');
@@ -488,7 +490,7 @@ function renderVehicleTypes() {
   document.querySelector('.panel-head')?.classList.remove('banner');
   els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = 'ประเภทรถ';
-  els.panelDesc.textContent = 'เลือกประเภทรถ แล้วระบบจะแสดงปุ่มย่อยยี่ห้อรถ';
+  showPanelDesc('เลือกประเภทรถ แล้วระบบจะแสดงปุ่มย่อยยี่ห้อรถ');
   els.btnGrid.innerHTML = '';
   els.summary.classList.add('hidden');
 
@@ -516,7 +518,7 @@ async function renderBrands() {
   document.querySelector('.panel-head')?.classList.remove('banner');
   els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = `ยี่ห้อรถ — ${displayVehicleType(state.vehicleType)}`;
-  els.panelDesc.textContent = 'เลือกยี่ห้อเพื่อดูสรุปจำนวน สีรถ และสีสติ๊กเกอร์';
+  showPanelDesc('เลือกยี่ห้อเพื่อดูสรุปจำนวน สีรถ และสีสติ๊กเกอร์');
   els.btnGrid.innerHTML = '<p class="empty">กำลังโหลดยี่ห้อ…</p>';
   els.summary.classList.add('hidden');
 
@@ -546,7 +548,7 @@ async function renderParkingLots() {
   document.querySelector('.panel-head')?.classList.remove('banner');
   els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = 'ประเภทลานจอด';
-  els.panelDesc.textContent = 'เลือกประเภทลานจอดเพื่อดูสรุปจำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์';
+  showPanelDesc('เลือกประเภทลานจอดเพื่อดูสรุปจำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์');
   els.btnGrid.innerHTML = '';
   els.summary.classList.add('hidden');
 
@@ -620,7 +622,7 @@ function renderSummary() {
   if (filters.parkingStatus === 'none') titleParts.push('ไม่มีสติ๊กเกอร์');
 
   els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
-  els.panelDesc.textContent = 'จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime';
+  showPanelDesc('จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime');
   els.btnGrid.innerHTML = '';
   els.summary.classList.remove('hidden');
 
