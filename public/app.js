@@ -18,9 +18,7 @@ const els = {
   panelDesc: document.getElementById('panel-desc'),
   crumbs: document.getElementById('crumbs'),
   summary: document.getElementById('summary'),
-  statTotal: document.getElementById('stat-total'),
   statFile: document.getElementById('stat-file'),
-  statSheet: document.getElementById('stat-sheet'),
   liveDot: document.getElementById('live-dot'),
   liveLabel: document.getElementById('live-label'),
   updatedAt: document.getElementById('updated-at'),
@@ -136,13 +134,11 @@ function formatTime(iso) {
 
 function applySnapshot(snapshot) {
   state.snapshot = snapshot;
-  els.statTotal.textContent = snapshot?.meta?.total ?? 0;
   const sheetId = snapshot?.spreadsheetId;
   if (sheetId && els.statFile) {
     els.statFile.href = `https://docs.google.com/spreadsheets/d/${sheetId}/edit?usp=sharing`;
     els.statFile.textContent = 'ไฟล์ข้อมูล';
   }
-  els.statSheet.textContent = snapshot?.sheetName || 'DATA';
   els.updatedAt.textContent = `อัปเดตล่าสุด ${formatTime(snapshot?.updatedAt)}`;
 }
 
