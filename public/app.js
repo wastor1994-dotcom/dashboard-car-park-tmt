@@ -8,6 +8,10 @@ const state = {
   summary: null,
 };
 
+/** Navigation history for Back button / browser back */
+const navStack = [];
+let suppressHistory = false;
+
 const els = {
   btnGrid: document.getElementById('btn-grid'),
   panelTitle: document.getElementById('panel-title'),
@@ -21,7 +25,96 @@ const els = {
   liveLabel: document.getElementById('live-label'),
   updatedAt: document.getElementById('updated-at'),
   btnReload: document.getElementById('btn-reload'),
+  btnBack: document.getElementById('btn-back'),
+  btnHome: document.getElementById('btn-home'),
 };
+
+function snapshotNav() {
+  return {
+    view: state.view,
+    vehicleType: state.vehicleType,
+    brand: state.brand,
+    parkingLot: state.parkingLot,
+    parkingStatus: state.parkingStatus,
+  };
+}
+
+function applyNav(nav) {
+  state.view = nav.view || 'home';
+  state.vehicleType = nav.vehicleType || null;
+  state.brand = nav.brand || null;
+  state.parkingLot = nav.parkingLot || null;
+  state.parkingStatus = nav.parkingStatus || null;
+  state.summary = null;
+}
+
+function updateBackButton() {
+  const show = state.view !== 'home';
+  els.btnBack?.classList.toggle('hidden', !show);
+}
+
+async function goHome() {
+  navStack.length = 0;
+  applyNav({ view: 'home' });
+  await render();
+  if (!suppressHistory) {
+    history.replaceState({ nav: snapshotNav(), stack: [] }, '', '#/');
+  }
+}
+
+function navHash(nav) {
+  const parts = [nav.view || 'home'];
+  if (nav.vehicleType) parts.push(encodeURIComponent(nav.vehicleType));
+  if (nav.brand) parts.push(encodeURIComponent(nav.brand));
+  if (nav.parkingLot) parts.push(encodeURIComponent(nav.parkingLot));
+  if (nav.parkingStatus) parts.push(nav.parkingStatus);
+  return `#/${parts.join('/')}`;
+}
+
+async function goBack() {
+  if (navStack.length > 0) {
+    history.back();
+    return;
+  }
+
+  // Fallback one-level up when stack empty
+  if (state.view === 'summary' && state.brand && state.vehicleType) {
+    applyNav({ view: 'brands', vehicleType: state.vehicleType });
+  } else if (state.view === 'summary' && state.parkingLot) {
+    applyNav({ view: 'parkingLots' });
+  } else if (state.view === 'brands') {
+    applyNav({ view: 'vehicleTypes' });
+  } else {
+    applyNav({ view: 'home' });
+  }
+  state.summary = null;
+  await render();
+  history.replaceState({ nav: snapshotNav(), stack: [] }, '', navHash(snapshotNav()));
+}
+
+async function navigate(next, { push = true } = {}) {
+  if (push) {
+    navStack.push(snapshotNav());
+  }
+  applyNav(next);
+  if (next.view === 'summary') {
+    await loadSummary({
+      vehicleType: next.vehicleType,
+      brand: next.brand,
+      parkingLot: next.parkingLot,
+      parkingStatus: next.parkingStatus,
+    });
+  } else {
+    state.summary = null;
+  }
+  await render();
+  if (!suppressHistory) {
+    const hist = { nav: snapshotNav(), stack: navStack.map((x) => ({ ...x })) };
+    const url = navHash(snapshotNav());
+    if (push) history.pushState(hist, '', url);
+    else history.replaceState(hist, '', url);
+  }
+}
 
 async function api(path) {
   const res = await fetch(path);
@@ -71,38 +164,36 @@ function crumb(label, onClick, active = false) {
 function renderCrumbs() {
   els.crumbs.innerHTML = '';
   els.crumbs.appendChild(
-    crumb('หน้าแรก', () => {
-      state.view = 'home';
-      state.vehicleType = null;
-      state.brand = null;
-      state.parkingLot = null;
-      state.parkingStatus = null;
-      state.summary = null;
-      render();
-    }, state.view === 'home'),
+    crumb(
+      'หน้าแรก',
+      () => {
+        goHome();
+      },
+      state.view === 'home',
+    ),
   );
 
   if (state.vehicleType || state.view === 'vehicleTypes' || state.view === 'brands') {
     els.crumbs.appendChild(
-      crumb('ประเภทรถ', () => {
-        state.view = 'vehicleTypes';
-        state.vehicleType = null;
-        state.brand = null;
-        state.parkingStatus = null;
-        state.summary = null;
-        render();
-      }, state.view === 'vehicleTypes'),
+      crumb(
+        'ประเภทรถ',
+        () => {
+          navigate({ view: 'vehicleTypes' }, { push: true });
+        },
+        state.view === 'vehicleTypes',
+      ),
     );
   }
 
   if (state.vehicleType) {
     els.crumbs.appendChild(
-      crumb(displayVehicleType(state.vehicleType), () => {
-        state.view = 'brands';
-        state.brand = null;
-        state.summary = null;
-        render();
-      }, state.view === 'brands' && !state.brand),
+      crumb(
+        displayVehicleType(state.vehicleType),
+        () => {
+          navigate({ view: 'brands', vehicleType: state.vehicleType }, { push: true });
+        },
+        state.view === 'brands' && !state.brand,
+      ),
     );
   }
 
@@ -112,15 +203,13 @@ function renderCrumbs() {
 
   if (state.view === 'parkingLots' || state.parkingLot) {
     els.crumbs.appendChild(
-      crumb('ลานจอด', () => {
-        state.view = 'parkingLots';
-        state.parkingLot = null;
-        state.vehicleType = null;
-        state.brand = null;
-        state.parkingStatus = null;
-        state.summary = null;
-        render();
-      }, state.view === 'parkingLots'),
+      crumb(
+        'ลานจอด',
+        () => {
+          navigate({ view: 'parkingLots' }, { push: true });
+        },
+        state.view === 'parkingLots',
+      ),
     );
   }
 
@@ -150,14 +239,16 @@ function parkingCount(key) {
 }
 
 async function openSummary(filters = {}) {
-  state.vehicleType = filters.vehicleType || null;
-  state.brand = filters.brand || null;
-  state.parkingLot = filters.parkingLot || null;
-  state.parkingStatus = filters.parkingStatus || null;
-  state.view = 'summary';
-  state.summary = null;
-  await loadSummary(filters);
-  render();
+  await navigate(
+    {
+      view: 'summary',
+      vehicleType: filters.vehicleType || null,
+      brand: filters.brand || null,
+      parkingLot: filters.parkingLot || null,
+      parkingStatus: filters.parkingStatus || null,
+    },
+    { push: true },
+  );
 }
 
 function kpiCard({ label, count, tone, onClick }) {
@@ -259,8 +350,7 @@ function renderHome() {
       onClick: () => {
         clearHomeNav();
         els.btnGrid.className = 'btn-grid';
-        state.view = 'vehicleTypes';
-        render();
+        navigate({ view: 'vehicleTypes' }, { push: true });
       },
     }),
   );
@@ -272,8 +362,7 @@ function renderHome() {
       onClick: () => {
         clearHomeNav();
         els.btnGrid.className = 'btn-grid';
-        state.view = 'parkingLots';
-        render();
+        navigate({ view: 'parkingLots' }, { push: true });
       },
     }),
   );
@@ -301,9 +390,7 @@ function renderVehicleTypes() {
         label: displayVehicleType(item.name),
         count: item.count,
         onClick: () => {
-          state.vehicleType = item.name;
-          state.view = 'brands';
-          render();
+          navigate({ view: 'brands', vehicleType: item.name }, { push: true });
         },
       }),
     );
@@ -332,11 +419,8 @@ async function renderBrands() {
       choiceButton({
         label: item.name,
         count: item.count,
-        onClick: async () => {
-          state.brand = item.name;
-          state.view = 'summary';
-          await loadSummary({ vehicleType: state.vehicleType, brand: state.brand });
-          render();
+        onClick: () => {
+          openSummary({ vehicleType: state.vehicleType, brand: item.name });
         },
       }),
     );
@@ -363,11 +447,8 @@ async function renderParkingLots() {
       choiceButton({
         label: item.name,
         count: item.count,
-        onClick: async () => {
-          state.parkingLot = item.name;
-          state.view = 'summary';
-          await loadSummary({ parkingLot: state.parkingLot });
-          render();
+        onClick: () => {
+          openSummary({ parkingLot: item.name });
         },
       }),
     );
@@ -494,10 +575,10 @@ function renderSummary() {
 
 async function render() {
   renderCrumbs();
+  updateBackButton();
 
   if (state.snapshot && state.snapshot.ok === false) {
-    // keep going; show banner in panel via desc
-    els.panelDesc.textContent = state.snapshot.error || 'อ่าน Excel ไม่สำเร็จ';
+    els.panelDesc.textContent = state.snapshot.error || 'อ่านข้อมูลไม่สำเร็จ';
   }
 
   try {
@@ -590,6 +671,40 @@ els.btnReload.addEventListener('click', async () => {
   await refreshCurrentView();
 });
 
+els.btnBack?.addEventListener('click', () => {
+  goBack();
+});
+
+els.btnHome?.addEventListener('click', () => {
+  goHome();
+});
+
+window.addEventListener('popstate', async (ev) => {
+  suppressHistory = true;
+  const data = ev.state;
+  if (data?.nav) {
+    navStack.length = 0;
+    if (Array.isArray(data.stack)) {
+      for (const item of data.stack) navStack.push(item);
+    }
+    applyNav(data.nav);
+    if (data.nav.view === 'summary') {
+      await loadSummary({
+        vehicleType: data.nav.vehicleType,
+        brand: data.nav.brand,
+        parkingLot: data.nav.parkingLot,
+        parkingStatus: data.nav.parkingStatus,
+      });
+    } else {
+      state.summary = null;
+    }
+    await render();
+  } else {
+    await goHome();
+  }
+  suppressHistory = false;
+});
+
 async function boot() {
   try {
     const snap = await api('/api/snapshot');
@@ -599,6 +714,7 @@ async function boot() {
   } catch {
     setLive(false);
   }
+  history.replaceState({ nav: snapshotNav(), stack: [] }, '', '#/');
   await render();
   startPolling(5000);
   connectSSE();

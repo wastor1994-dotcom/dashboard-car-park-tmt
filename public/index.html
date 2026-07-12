@@ -18,7 +18,7 @@
 
     <header class="topbar">
       <div class="brand-block">
-        <p class="brand">Car Park TMT</p>
+        <button type="button" class="brand brand-btn" id="btn-home" title="กลับหน้าแรก">Car Park TMT</button>
         <p class="brand-sub">Dashboard ลานจอดรถ · Google Sheets Realtime</p>
       </div>
       <div class="status-block">
@@ -32,7 +32,12 @@
     </header>
 
     <main class="shell">
-      <nav class="crumbs" id="crumbs" aria-label="เส้นทางเมนู"></nav>
+      <div class="nav-row" id="nav-row">
+        <button type="button" id="btn-back" class="btn back-btn hidden" aria-label="ย้อนกลับ">
+          ← ย้อนกลับ
+        </button>
+        <nav class="crumbs" id="crumbs" aria-label="เส้นทางเมนู"></nav>
+      </div>
 
       <section class="hero-stats" id="hero-stats">
         <div class="stat">

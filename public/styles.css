@@ -93,6 +93,19 @@ body {
   animation: brandIn 0.7s ease both;
 }
 
+.brand-btn {
+  appearance: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  display: inline-block;
+}
+
+.brand-btn:hover {
+  filter: brightness(1.08);
+}
+
 .brand-sub {
   margin: 0.45rem 0 0;
   color: var(--muted);
@@ -157,12 +170,47 @@ body {
   margin: 0 auto;
 }
 
+.nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  min-height: 2.4rem;
+}
+
 .crumbs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-bottom: 1rem;
-  min-height: 2rem;
+  margin-bottom: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.back-btn {
+  appearance: none;
+  border: 1px solid rgba(212, 255, 79, 0.45);
+  background: rgba(212, 255, 79, 0.12);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+  flex-shrink: 0;
+}
+
+.back-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.back-btn.hidden {
+  display: none;
 }
 
 .crumb {
