@@ -107,6 +107,7 @@ function emptyMeta() {
     total: 0,
     vehicleTypes: [],
     parkingLots: [],
+    parkingStatus: [],
     brandsByType: {},
   };
 }
@@ -134,6 +135,9 @@ function buildMeta(records) {
     brandsByType[vt] = uniqueSorted(subset.map((r) => r.brand));
   }
 
+  const hasParking = records.filter((r) => r.hasSticker === 'มีสติ๊กเกอร์').length;
+  const noParking = records.filter((r) => r.hasSticker !== 'มีสติ๊กเกอร์').length;
+
   return {
     total: records.length,
     vehicleTypes: vehicleTypes.map((name) => ({
@@ -141,6 +145,11 @@ function buildMeta(records) {
       count: records.filter((r) => r.vehicleType === name).length,
     })),
     parkingLots: countMap(records, (r) => r.parkingLot),
+    /** Sticker ในชีต = สิทธิ์มีที่จอดรถ */
+    parkingStatus: [
+      { key: 'has', name: 'มีที่จอดรถ', count: hasParking },
+      { key: 'none', name: 'ไม่มีที่จอดรถ', count: noParking },
+    ],
     brandsByType,
   };
 }
@@ -362,11 +371,13 @@ export function summarize(records) {
   };
 }
 
-export function filterRecords(records, { vehicleType, brand, parkingLot } = {}) {
+export function filterRecords(records, { vehicleType, brand, parkingLot, parkingStatus } = {}) {
   return records.filter((r) => {
     if (vehicleType && r.vehicleType !== vehicleType) return false;
     if (brand && r.brand !== brand) return false;
     if (parkingLot && r.parkingLot !== parkingLot) return false;
+    if (parkingStatus === 'has' && r.hasSticker !== 'มีสติ๊กเกอร์') return false;
+    if (parkingStatus === 'none' && r.hasSticker === 'มีสติ๊กเกอร์') return false;
     return true;
   });
 }

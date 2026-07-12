@@ -3,6 +3,7 @@ const state = {
   vehicleType: null,
   brand: null,
   parkingLot: null,
+  parkingStatus: null, // 'has' | 'none' | null
   snapshot: null,
   summary: null,
 };
@@ -75,6 +76,7 @@ function renderCrumbs() {
       state.vehicleType = null;
       state.brand = null;
       state.parkingLot = null;
+      state.parkingStatus = null;
       state.summary = null;
       render();
     }, state.view === 'home'),
@@ -86,6 +88,7 @@ function renderCrumbs() {
         state.view = 'vehicleTypes';
         state.vehicleType = null;
         state.brand = null;
+        state.parkingStatus = null;
         state.summary = null;
         render();
       }, state.view === 'vehicleTypes'),
@@ -94,7 +97,7 @@ function renderCrumbs() {
 
   if (state.vehicleType) {
     els.crumbs.appendChild(
-      crumb(state.vehicleType, () => {
+      crumb(displayVehicleType(state.vehicleType), () => {
         state.view = 'brands';
         state.brand = null;
         state.summary = null;
@@ -114,6 +117,7 @@ function renderCrumbs() {
         state.parkingLot = null;
         state.vehicleType = null;
         state.brand = null;
+        state.parkingStatus = null;
         state.summary = null;
         render();
       }, state.view === 'parkingLots'),
@@ -123,6 +127,48 @@ function renderCrumbs() {
   if (state.parkingLot) {
     els.crumbs.appendChild(crumb(state.parkingLot, null, true));
   }
+
+  if (state.parkingStatus === 'has') {
+    els.crumbs.appendChild(crumb('มีที่จอดรถ', null, true));
+  } else if (state.parkingStatus === 'none') {
+    els.crumbs.appendChild(crumb('ไม่มีที่จอดรถ', null, true));
+  }
+}
+
+function displayVehicleType(name) {
+  if (name === 'มอร์เตอร์ไซต์') return 'รถจักรยานยนต์';
+  if (name === 'ไม่มีประเภทรถ') return 'ไม่ระบุประเภท';
+  return name;
+}
+
+function typeCount(name) {
+  return state.snapshot?.meta?.vehicleTypes?.find((t) => t.name === name)?.count ?? 0;
+}
+
+function parkingCount(key) {
+  return state.snapshot?.meta?.parkingStatus?.find((t) => t.key === key)?.count ?? 0;
+}
+
+async function openSummary(filters = {}) {
+  state.vehicleType = filters.vehicleType || null;
+  state.brand = filters.brand || null;
+  state.parkingLot = filters.parkingLot || null;
+  state.parkingStatus = filters.parkingStatus || null;
+  state.view = 'summary';
+  state.summary = null;
+  await loadSummary(filters);
+  render();
+}
+
+function kpiCard({ label, count, tone, onClick }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `kpi kpi-${tone}`;
+  btn.innerHTML = `<strong class="kpi-count"></strong><span class="kpi-label"></span>`;
+  btn.querySelector('.kpi-count').textContent = Number(count || 0).toLocaleString('th-TH');
+  btn.querySelector('.kpi-label').textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 function choiceButton({ label, count, primary = false, onClick }) {
@@ -137,39 +183,107 @@ function choiceButton({ label, count, primary = false, onClick }) {
   return btn;
 }
 
+function clearHomeNav() {
+  els.btnGrid.parentElement?.querySelectorAll('.home-nav').forEach((el) => el.remove());
+}
+
 function renderHome() {
-  els.panelTitle.textContent = 'เลือกหัวข้อ';
-  els.panelDesc.textContent = 'เลือกประเภทรถ หรือลานจอด เพื่อดูข้อมูลย่อยและสรุป';
+  clearHomeNav();
+  const head = document.querySelector('.panel-head');
+  head?.classList.add('banner');
+  els.panelTitle.textContent = 'Dashboard สรุปข้อมูลรถและลานจอด';
+  els.panelDesc.textContent = 'คลิกการ์ดเพื่อดูรายละเอียด';
   els.btnGrid.innerHTML = '';
+  els.btnGrid.className = 'kpi-grid';
   els.summary.classList.add('hidden');
   els.summary.innerHTML = '';
 
+  const total = state.snapshot?.meta?.total ?? 0;
+
   els.btnGrid.appendChild(
+    kpiCard({
+      label: 'รถทั้งหมด',
+      count: total,
+      tone: 'navy',
+      onClick: () => openSummary({}),
+    }),
+  );
+  els.btnGrid.appendChild(
+    kpiCard({
+      label: 'รถยนต์',
+      count: typeCount('รถยนต์'),
+      tone: 'teal',
+      onClick: () => openSummary({ vehicleType: 'รถยนต์' }),
+    }),
+  );
+  els.btnGrid.appendChild(
+    kpiCard({
+      label: 'รถจักรยานยนต์',
+      count: typeCount('มอร์เตอร์ไซต์'),
+      tone: 'orange',
+      onClick: () => openSummary({ vehicleType: 'มอร์เตอร์ไซต์' }),
+    }),
+  );
+  els.btnGrid.appendChild(
+    kpiCard({
+      label: 'ไม่ระบุประเภท',
+      count: typeCount('ไม่มีประเภทรถ'),
+      tone: 'gray',
+      onClick: () => openSummary({ vehicleType: 'ไม่มีประเภทรถ' }),
+    }),
+  );
+  els.btnGrid.appendChild(
+    kpiCard({
+      label: 'มีที่จอดรถ',
+      count: parkingCount('has'),
+      tone: 'green',
+      onClick: () => openSummary({ parkingStatus: 'has' }),
+    }),
+  );
+  els.btnGrid.appendChild(
+    kpiCard({
+      label: 'ไม่มีที่จอดรถ',
+      count: parkingCount('none'),
+      tone: 'red',
+      onClick: () => openSummary({ parkingStatus: 'none' }),
+    }),
+  );
+
+  const nav = document.createElement('div');
+  nav.className = 'home-nav';
+  nav.appendChild(
     choiceButton({
-      label: 'ประเภทรถ',
-      count: state.snapshot?.meta?.total,
+      label: 'ดูตามประเภทรถ / ยี่ห้อ',
+      count: total,
       primary: true,
       onClick: () => {
+        clearHomeNav();
+        els.btnGrid.className = 'btn-grid';
         state.view = 'vehicleTypes';
         render();
       },
     }),
   );
-
-  els.btnGrid.appendChild(
+  nav.appendChild(
     choiceButton({
-      label: 'ลานจอด',
+      label: 'ดูตามลานจอด',
       count: state.snapshot?.meta?.parkingLots?.length,
       primary: true,
       onClick: () => {
+        clearHomeNav();
+        els.btnGrid.className = 'btn-grid';
         state.view = 'parkingLots';
         render();
       },
     }),
   );
+  els.btnGrid.after(nav);
 }
 
 function renderVehicleTypes() {
+  clearHomeNav();
+  document.querySelector('.panel-head')?.classList.remove('banner');
+  els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = 'ประเภทรถ';
   els.panelDesc.textContent = 'เลือกประเภทรถ แล้วระบบจะแสดงปุ่มย่อยยี่ห้อรถ';
   els.btnGrid.innerHTML = '';
@@ -184,7 +298,7 @@ function renderVehicleTypes() {
   for (const item of items) {
     els.btnGrid.appendChild(
       choiceButton({
-        label: item.name,
+        label: displayVehicleType(item.name),
         count: item.count,
         onClick: () => {
           state.vehicleType = item.name;
@@ -197,7 +311,10 @@ function renderVehicleTypes() {
 }
 
 async function renderBrands() {
-  els.panelTitle.textContent = `ยี่ห้อรถ — ${state.vehicleType}`;
+  clearHomeNav();
+  document.querySelector('.panel-head')?.classList.remove('banner');
+  els.btnGrid.className = 'btn-grid';
+  els.panelTitle.textContent = `ยี่ห้อรถ — ${displayVehicleType(state.vehicleType)}`;
   els.panelDesc.textContent = 'เลือกยี่ห้อเพื่อดูสรุปจำนวน สีรถ และสีสติ๊กเกอร์';
   els.btnGrid.innerHTML = '<p class="empty">กำลังโหลดยี่ห้อ…</p>';
   els.summary.classList.add('hidden');
@@ -227,6 +344,9 @@ async function renderBrands() {
 }
 
 async function renderParkingLots() {
+  clearHomeNav();
+  document.querySelector('.panel-head')?.classList.remove('banner');
+  els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = 'ประเภทลานจอด';
   els.panelDesc.textContent = 'เลือกประเภทลานจอดเพื่อดูสรุปจำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์';
   els.btnGrid.innerHTML = '';
@@ -259,6 +379,7 @@ async function loadSummary(filters) {
   if (filters.vehicleType) q.set('vehicleType', filters.vehicleType);
   if (filters.brand) q.set('brand', filters.brand);
   if (filters.parkingLot) q.set('parkingLot', filters.parkingLot);
+  if (filters.parkingStatus) q.set('parkingStatus', filters.parkingStatus);
   const data = await api(`/api/summary?${q.toString()}`);
   state.summary = data;
 }
@@ -291,14 +412,19 @@ function escapeHtml(s) {
 }
 
 function renderSummary() {
+  clearHomeNav();
+  document.querySelector('.panel-head')?.classList.remove('banner');
+  els.btnGrid.className = 'btn-grid';
   const s = state.summary?.summary;
   const filters = state.summary?.filters || {};
   const titleParts = [];
   if (filters.parkingLot) titleParts.push(filters.parkingLot);
-  if (filters.vehicleType) titleParts.push(filters.vehicleType);
+  if (filters.vehicleType) titleParts.push(displayVehicleType(filters.vehicleType));
   if (filters.brand) titleParts.push(filters.brand);
+  if (filters.parkingStatus === 'has') titleParts.push('มีที่จอดรถ');
+  if (filters.parkingStatus === 'none') titleParts.push('ไม่มีที่จอดรถ');
 
-  els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'ทั้งหมด'}`;
+  els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
   els.panelDesc.textContent = 'จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime';
   els.btnGrid.innerHTML = '';
   els.summary.classList.remove('hidden');
@@ -327,7 +453,7 @@ function renderSummary() {
     <div class="summary-hero">
       <div>
         <div class="big">${s.total.toLocaleString('th-TH')}</div>
-        <div class="caption">จำนวนรถ (แถวใน Excel)</div>
+        <div class="caption">จำนวนรถ</div>
       </div>
     </div>
     <div class="buckets">
@@ -385,6 +511,7 @@ async function render() {
           vehicleType: state.vehicleType,
           brand: state.brand,
           parkingLot: state.parkingLot,
+          parkingStatus: state.parkingStatus,
         });
       }
       renderSummary();
@@ -401,6 +528,7 @@ async function refreshCurrentView() {
       vehicleType: state.vehicleType,
       brand: state.brand,
       parkingLot: state.parkingLot,
+      parkingStatus: state.parkingStatus,
     });
   }
   await render();
