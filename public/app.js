@@ -218,9 +218,9 @@ function renderCrumbs() {
   }
 
   if (state.parkingStatus === 'has') {
-    els.crumbs.appendChild(crumb('มีที่จอดรถ', null, true));
+    els.crumbs.appendChild(crumb('มีสติ๊กเกอร์', null, true));
   } else if (state.parkingStatus === 'none') {
-    els.crumbs.appendChild(crumb('ไม่มีที่จอดรถ', null, true));
+    els.crumbs.appendChild(crumb('ไม่มีสติ๊กเกอร์', null, true));
   }
 }
 
@@ -325,7 +325,7 @@ function renderHome() {
   );
   els.btnGrid.appendChild(
     kpiCard({
-      label: 'มีที่จอดรถ',
+      label: 'มีสติ๊กเกอร์',
       count: parkingCount('has'),
       tone: 'green',
       onClick: () => openSummary({ parkingStatus: 'has' }),
@@ -333,7 +333,7 @@ function renderHome() {
   );
   els.btnGrid.appendChild(
     kpiCard({
-      label: 'ไม่มีที่จอดรถ',
+      label: 'ไม่มีสติ๊กเกอร์',
       count: parkingCount('none'),
       tone: 'red',
       onClick: () => openSummary({ parkingStatus: 'none' }),
@@ -502,8 +502,8 @@ function renderSummary() {
   if (filters.parkingLot) titleParts.push(filters.parkingLot);
   if (filters.vehicleType) titleParts.push(displayVehicleType(filters.vehicleType));
   if (filters.brand) titleParts.push(filters.brand);
-  if (filters.parkingStatus === 'has') titleParts.push('มีที่จอดรถ');
-  if (filters.parkingStatus === 'none') titleParts.push('ไม่มีที่จอดรถ');
+  if (filters.parkingStatus === 'has') titleParts.push('มีสติ๊กเกอร์');
+  if (filters.parkingStatus === 'none') titleParts.push('ไม่มีสติ๊กเกอร์');
 
   els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
   els.panelDesc.textContent = 'จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime';

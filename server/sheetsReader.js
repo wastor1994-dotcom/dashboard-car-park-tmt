@@ -145,10 +145,10 @@ function buildMeta(records) {
       count: records.filter((r) => r.vehicleType === name).length,
     })),
     parkingLots: countMap(records, (r) => r.parkingLot),
-    /** Sticker ในชีต = สิทธิ์มีที่จอดรถ */
+    /** จากคอลัมน์ Sticker */
     parkingStatus: [
-      { key: 'has', name: 'มีที่จอดรถ', count: hasParking },
-      { key: 'none', name: 'ไม่มีที่จอดรถ', count: noParking },
+      { key: 'has', name: 'มีสติ๊กเกอร์', count: hasParking },
+      { key: 'none', name: 'ไม่มีสติ๊กเกอร์', count: noParking },
     ],
     brandsByType,
   };
