@@ -275,6 +275,10 @@ function showPanelDesc(text) {
   els.panelDesc.textContent = text;
 }
 
+function clearHomeNav() {
+  els.btnGrid.parentElement?.querySelectorAll('.home-nav, .home-charts').forEach((el) => el.remove());
+}
+
 function renderHome() {
   clearHomeNav();
   const head = document.querySelector('.panel-head');
