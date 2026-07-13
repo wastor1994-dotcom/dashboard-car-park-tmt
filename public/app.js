@@ -1,9 +1,10 @@
 const state = {
-  view: 'home', // home | vehicleTypes | brands | parkingLots | summary
+  view: 'home', // home | vehicleTypes | brands | parkingLots | departments | summary
   vehicleType: null,
   brand: null,
   parkingLot: null,
   parkingStatus: null, // 'has' | 'none' | null
+  department: null,
   snapshot: null,
   summary: null,
 };
@@ -34,6 +35,7 @@ function snapshotNav() {
     brand: state.brand,
     parkingLot: state.parkingLot,
     parkingStatus: state.parkingStatus,
+    department: state.department,
   };
 }
 
@@ -43,6 +45,7 @@ function applyNav(nav) {
   state.brand = nav.brand || null;
   state.parkingLot = nav.parkingLot || null;
   state.parkingStatus = nav.parkingStatus || null;
+  state.department = nav.department || null;
   state.summary = null;
 }
 
@@ -62,6 +65,7 @@ async function goHome() {
 
 function navHash(nav) {
   const parts = [nav.view || 'home'];
+  if (nav.department) parts.push(`dept-${encodeURIComponent(nav.department)}`);
   if (nav.vehicleType) parts.push(encodeURIComponent(nav.vehicleType));
   if (nav.brand) parts.push(encodeURIComponent(nav.brand));
   if (nav.parkingLot) parts.push(encodeURIComponent(nav.parkingLot));
@@ -76,16 +80,23 @@ async function goBack() {
   }
 
   // Fallback one-level up when stack empty
-  if (state.view === 'summary' && state.brand && state.vehicleType) {
+  if (state.view === 'summary' && state.department && (state.parkingStatus || state.vehicleType)) {
+    applyNav({ view: 'summary', department: state.department });
+    await loadSummary({ department: state.department });
+  } else if (state.view === 'summary' && state.department) {
+    applyNav({ view: 'departments' });
+  } else if (state.view === 'summary' && state.brand && state.vehicleType) {
     applyNav({ view: 'brands', vehicleType: state.vehicleType });
   } else if (state.view === 'summary' && state.parkingLot) {
     applyNav({ view: 'parkingLots' });
   } else if (state.view === 'brands') {
     applyNav({ view: 'vehicleTypes' });
+  } else if (state.view === 'departments') {
+    applyNav({ view: 'home' });
   } else {
     applyNav({ view: 'home' });
   }
-  state.summary = null;
+  if (state.view !== 'summary') state.summary = null;
   await render();
   history.replaceState({ nav: snapshotNav(), stack: [] }, '', navHash(snapshotNav()));
 }
@@ -101,6 +112,7 @@ async function navigate(next, { push = true } = {}) {
       brand: next.brand,
       parkingLot: next.parkingLot,
       parkingStatus: next.parkingStatus,
+      department: next.department,
     });
   } else {
     state.summary = null;
@@ -213,10 +225,38 @@ function renderCrumbs() {
     els.crumbs.appendChild(crumb(state.parkingLot, null, true));
   }
 
+  if (state.view === 'departments' || state.department) {
+    els.crumbs.appendChild(
+      crumb(
+        'แผนก',
+        () => {
+          navigate({ view: 'departments' }, { push: true });
+        },
+        state.view === 'departments',
+      ),
+    );
+  }
+
+  if (state.department) {
+    els.crumbs.appendChild(
+      crumb(
+        state.department,
+        () => {
+          openSummary({ department: state.department });
+        },
+        state.view === 'summary' && !state.parkingStatus && !state.vehicleType,
+      ),
+    );
+  }
+
   if (state.parkingStatus === 'has') {
     els.crumbs.appendChild(crumb('มีสติ๊กเกอร์', null, true));
   } else if (state.parkingStatus === 'none') {
     els.crumbs.appendChild(crumb('ไม่มีสติ๊กเกอร์', null, true));
+  }
+
+  if (state.department && state.vehicleType && !state.brand) {
+    els.crumbs.appendChild(crumb(displayVehicleType(state.vehicleType), null, true));
   }
 }
 
@@ -242,6 +282,7 @@ async function openSummary(filters = {}) {
       brand: filters.brand || null,
       parkingLot: filters.parkingLot || null,
       parkingStatus: filters.parkingStatus || null,
+      department: filters.department || null,
     },
     { push: true },
   );
@@ -363,6 +404,17 @@ function renderHome() {
         clearHomeNav();
         els.btnGrid.className = 'btn-grid';
         navigate({ view: 'parkingLots' }, { push: true });
+      },
+    }),
+  );
+  nav.appendChild(
+    choiceButton({
+      label: 'แผนก',
+      primary: true,
+      onClick: () => {
+        clearHomeNav();
+        els.btnGrid.className = 'btn-grid';
+        navigate({ view: 'departments' }, { push: true });
       },
     }),
   );
@@ -575,12 +627,41 @@ async function renderParkingLots() {
   }
 }
 
+function renderDepartments() {
+  clearHomeNav();
+  document.querySelector('.panel-head')?.classList.remove('banner');
+  els.btnGrid.className = 'btn-grid dept-grid';
+  els.panelTitle.textContent = 'แผนก';
+  showPanelDesc('เลือกแผนกเพื่อดูรถที่ใช้ และสถานะสติ๊กเกอร์');
+  els.btnGrid.innerHTML = '';
+  els.summary.classList.add('hidden');
+
+  const items = state.snapshot?.meta?.departments || [];
+  if (!items.length) {
+    els.btnGrid.innerHTML = '<p class="empty">ยังไม่มีข้อมูลแผนก</p>';
+    return;
+  }
+
+  for (const item of items) {
+    els.btnGrid.appendChild(
+      choiceButton({
+        label: item.name,
+        count: item.count,
+        onClick: () => {
+          openSummary({ department: item.name });
+        },
+      }),
+    );
+  }
+}
+
 async function loadSummary(filters) {
   const q = new URLSearchParams();
   if (filters.vehicleType) q.set('vehicleType', filters.vehicleType);
   if (filters.brand) q.set('brand', filters.brand);
   if (filters.parkingLot) q.set('parkingLot', filters.parkingLot);
   if (filters.parkingStatus) q.set('parkingStatus', filters.parkingStatus);
+  if (filters.department) q.set('department', filters.department);
   const data = await api(`/api/summary?${q.toString()}`);
   state.summary = data;
 }
@@ -612,6 +693,38 @@ function escapeHtml(s) {
     .replaceAll('"', '&quot;');
 }
 
+function vehicleCardsHtml(vehicles, { showOwner = false } = {}) {
+  if (!vehicles?.length) return '<p class="empty">ไม่มีรายการรถ</p>';
+  return `<div class="vehicle-list">${vehicles
+    .map((v, idx) => {
+      const stickerClass = v.hasSticker === 'มีสติ๊กเกอร์' ? 'yes' : 'no';
+      const owner = v.employee && v.employee !== '-' ? v.employee : 'ไม่ระบุเจ้าของ';
+      return `<button type="button" class="vehicle-card${showOwner ? ' open' : ''}" data-idx="${idx}">
+        <div class="vc-top">
+          <strong class="vc-plate">${escapeHtml(v.plate)}</strong>
+          <span class="sticker-badge ${stickerClass}">${escapeHtml(v.hasSticker)}</span>
+        </div>
+        <div class="vc-meta">
+          <span>${escapeHtml(displayVehicleType(v.vehicleType))}</span>
+          <span>${escapeHtml(v.brand)}</span>
+          <span>${escapeHtml(v.vehicleColor)}</span>
+        </div>
+        <div class="vc-owner">เจ้าของรถ: <strong>${escapeHtml(owner)}</strong></div>
+        <div class="vc-hint">${showOwner ? '' : 'คลิกเพื่อดูชื่อเจ้าของรถ'}</div>
+      </button>`;
+    })
+    .join('')}</div>`;
+}
+
+function bindVehicleCards(root, { showOwner = false } = {}) {
+  if (showOwner) return;
+  root.querySelectorAll('.vehicle-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      card.classList.toggle('open');
+    });
+  });
+}
+
 function renderSummary() {
   clearHomeNav();
   document.querySelector('.panel-head')?.classList.remove('banner');
@@ -619,14 +732,24 @@ function renderSummary() {
   const s = state.summary?.summary;
   const filters = state.summary?.filters || {};
   const titleParts = [];
+  if (filters.department) titleParts.push(`แผนก ${filters.department}`);
   if (filters.parkingLot) titleParts.push(filters.parkingLot);
   if (filters.vehicleType) titleParts.push(displayVehicleType(filters.vehicleType));
   if (filters.brand) titleParts.push(filters.brand);
   if (filters.parkingStatus === 'has') titleParts.push('มีสติ๊กเกอร์');
   if (filters.parkingStatus === 'none') titleParts.push('ไม่มีสติ๊กเกอร์');
 
+  const isDept = Boolean(filters.department);
+  const showOwnerAlways = Boolean(
+    filters.department || filters.vehicleType || filters.parkingStatus || filters.brand,
+  );
+
   els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
-  showPanelDesc('จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime');
+  showPanelDesc(
+    isDept
+      ? 'รถของแผนกนี้ · คลิกการ์ดรถหรือดูสติ๊กเกอร์เพื่อดูชื่อเจ้าของรถ'
+      : 'จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime',
+  );
   els.btnGrid.innerHTML = '';
   els.summary.classList.remove('hidden');
 
@@ -635,15 +758,40 @@ function renderSummary() {
     return;
   }
 
+  const stickerHas = s.bySticker?.find((x) => x.name === 'มีสติ๊กเกอร์')?.count ?? 0;
+  const stickerNone = s.bySticker?.find((x) => x.name === 'ไม่มีสติ๊กเกอร์')?.count ?? 0;
+  const carCount = s.vehicles?.filter((v) => v.vehicleType === 'รถยนต์').length ?? 0;
+  const bikeCount = s.vehicles?.filter((v) => v.vehicleType === 'มอร์เตอร์ไซต์').length ?? 0;
+
+  let deptFilters = '';
+  if (isDept && !filters.parkingStatus && !filters.vehicleType) {
+    deptFilters = `
+      <div class="dept-filters">
+        <button type="button" class="mini-kpi mini-teal" data-filter="type" data-value="รถยนต์">
+          <strong>${carCount.toLocaleString('th-TH')}</strong><span>รถยนต์</span>
+        </button>
+        <button type="button" class="mini-kpi mini-orange" data-filter="type" data-value="มอร์เตอร์ไซต์">
+          <strong>${bikeCount.toLocaleString('th-TH')}</strong><span>รถจักรยานยนต์</span>
+        </button>
+        <button type="button" class="mini-kpi mini-green" data-filter="sticker" data-value="has">
+          <strong>${stickerHas.toLocaleString('th-TH')}</strong><span>มีสติ๊กเกอร์</span>
+        </button>
+        <button type="button" class="mini-kpi mini-red" data-filter="sticker" data-value="none">
+          <strong>${stickerNone.toLocaleString('th-TH')}</strong><span>ไม่มีสติ๊กเกอร์</span>
+        </button>
+      </div>`;
+  }
+
   const rows = (s.vehicles || [])
     .map(
       (v) => `<tr>
         <td>${escapeHtml(v.plate)}</td>
+        <td><strong>${escapeHtml(v.employee || '-')}</strong></td>
+        <td>${escapeHtml(displayVehicleType(v.vehicleType))}</td>
         <td>${escapeHtml(v.brand)}</td>
         <td>${escapeHtml(v.vehicleColor)}</td>
         <td>${escapeHtml(v.stickerColor)}</td>
         <td>${escapeHtml(v.hasSticker)}</td>
-        <td>${escapeHtml(v.employee)}</td>
         <td>${escapeHtml(v.department)}</td>
         <td>${escapeHtml(v.division)}</td>
       </tr>`,
@@ -657,6 +805,13 @@ function renderSummary() {
         <div class="caption">จำนวนรถ</div>
       </div>
     </div>
+    ${deptFilters}
+    ${
+      isDept || showOwnerAlways
+        ? `<h3 class="section-title">รายการรถ${showOwnerAlways ? ' · มีชื่อเจ้าของรถ' : ''}</h3>
+           ${vehicleCardsHtml(s.vehicles, { showOwner: showOwnerAlways })}`
+        : ''
+    }
     <div class="buckets">
       ${bucketHtml('ยี่ห้อรถ', s.byBrand, s.total)}
       ${bucketHtml('สีรถ', s.byVehicleColor, s.total)}
@@ -668,19 +823,34 @@ function renderSummary() {
         <thead>
           <tr>
             <th>ทะเบียน</th>
+            <th>เจ้าของรถ</th>
+            <th>ประเภท</th>
             <th>ยี่ห้อ</th>
             <th>สีรถ</th>
             <th>สีสติ๊กเกอร์</th>
             <th>สติ๊กเกอร์</th>
-            <th>พนักงาน</th>
             <th>แผนก</th>
             <th>ฝ่าย</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="8">ไม่มีรายการ</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="9">ไม่มีรายการ</td></tr>'}</tbody>
       </table>
     </div>
   `;
+
+  bindVehicleCards(els.summary, { showOwner: showOwnerAlways });
+
+  els.summary.querySelectorAll('.mini-kpi').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.filter;
+      const value = btn.dataset.value;
+      if (kind === 'sticker') {
+        openSummary({ department: filters.department, parkingStatus: value });
+      } else if (kind === 'type') {
+        openSummary({ department: filters.department, vehicleType: value });
+      }
+    });
+  });
 
   requestAnimationFrame(() => {
     els.summary.querySelectorAll('.bar-fill').forEach((el) => {
@@ -706,6 +876,7 @@ async function render() {
     else if (state.view === 'vehicleTypes') renderVehicleTypes();
     else if (state.view === 'brands') await renderBrands();
     else if (state.view === 'parkingLots') await renderParkingLots();
+    else if (state.view === 'departments') renderDepartments();
     else if (state.view === 'summary') {
       if (!state.summary) {
         await loadSummary({
@@ -713,6 +884,7 @@ async function render() {
           brand: state.brand,
           parkingLot: state.parkingLot,
           parkingStatus: state.parkingStatus,
+          department: state.department,
         });
       }
       renderSummary();
@@ -730,6 +902,7 @@ async function refreshCurrentView() {
       brand: state.brand,
       parkingLot: state.parkingLot,
       parkingStatus: state.parkingStatus,
+      department: state.department,
     });
   }
   await render();
@@ -814,6 +987,7 @@ window.addEventListener('popstate', async (ev) => {
         brand: data.nav.brand,
         parkingLot: data.nav.parkingLot,
         parkingStatus: data.nav.parkingStatus,
+        department: data.nav.department,
       });
     } else {
       state.summary = null;

@@ -108,6 +108,7 @@ function emptyMeta() {
     vehicleTypes: [],
     parkingLots: [],
     parkingStatus: [],
+    departments: [],
     brandsByType: {},
   };
 }
@@ -150,6 +151,10 @@ function buildMeta(records) {
       { key: 'has', name: 'มีสติ๊กเกอร์', count: hasParking },
       { key: 'none', name: 'ไม่มีสติ๊กเกอร์', count: noParking },
     ],
+    departments: countMap(
+      records.filter((r) => r.department && r.department !== '-'),
+      (r) => r.department,
+    ),
     brandsByType,
   };
 }
@@ -371,11 +376,15 @@ export function summarize(records) {
   };
 }
 
-export function filterRecords(records, { vehicleType, brand, parkingLot, parkingStatus } = {}) {
+export function filterRecords(
+  records,
+  { vehicleType, brand, parkingLot, parkingStatus, department } = {},
+) {
   return records.filter((r) => {
     if (vehicleType && r.vehicleType !== vehicleType) return false;
     if (brand && r.brand !== brand) return false;
     if (parkingLot && r.parkingLot !== parkingLot) return false;
+    if (department && r.department !== department) return false;
     if (parkingStatus === 'has' && r.hasSticker !== 'มีสติ๊กเกอร์') return false;
     if (parkingStatus === 'none' && r.hasSticker === 'มีสติ๊กเกอร์') return false;
     return true;

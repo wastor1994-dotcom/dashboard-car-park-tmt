@@ -16,7 +16,7 @@ let cache = {
   fileName: 'Google Sheets',
   updatedAt: null,
   records: [],
-  meta: { total: 0, vehicleTypes: [], parkingLots: [], parkingStatus: [], brandsByType: {} },
+  meta: { total: 0, vehicleTypes: [], parkingLots: [], parkingStatus: [], departments: [], brandsByType: {} },
   fingerprint: '',
 };
 
@@ -130,14 +130,20 @@ export function createApp({ serveStatic = true } = {}) {
     res.json({ items: cache.meta?.parkingLots || [] });
   });
 
+  app.get('/api/departments', async (_req, res) => {
+    await ensureData();
+    res.json({ items: cache.meta?.departments || [] });
+  });
+
   app.get('/api/summary', async (req, res) => {
     await ensureData();
-    const { vehicleType, brand, parkingLot, parkingStatus } = req.query;
+    const { vehicleType, brand, parkingLot, parkingStatus, department } = req.query;
     const filtered = filterRecords(cache.records || [], {
       vehicleType: vehicleType || undefined,
       brand: brand || undefined,
       parkingLot: parkingLot || undefined,
       parkingStatus: parkingStatus || undefined,
+      department: department || undefined,
     });
     res.json({
       filters: {
@@ -145,6 +151,7 @@ export function createApp({ serveStatic = true } = {}) {
         brand: brand || null,
         parkingLot: parkingLot || null,
         parkingStatus: parkingStatus || null,
+        department: department || null,
       },
       summary: summarize(filtered),
     });
