@@ -80,7 +80,10 @@ async function goBack() {
   }
 
   // Fallback one-level up when stack empty
-  if (state.view === 'summary' && state.department && (state.parkingStatus || state.vehicleType)) {
+  if (state.view === 'summary' && state.parkingLot && (state.department || state.parkingStatus || state.vehicleType)) {
+    applyNav({ view: 'summary', parkingLot: state.parkingLot });
+    await loadSummary({ parkingLot: state.parkingLot });
+  } else if (state.view === 'summary' && state.department && (state.parkingStatus || state.vehicleType)) {
     applyNav({ view: 'summary', department: state.department });
     await loadSummary({ department: state.department });
   } else if (state.view === 'summary' && state.department) {
@@ -596,7 +599,7 @@ async function renderParkingLots() {
   document.querySelector('.panel-head')?.classList.remove('banner');
   els.btnGrid.className = 'btn-grid';
   els.panelTitle.textContent = 'ประเภทลานจอด';
-  showPanelDesc('เลือกประเภทลานจอดเพื่อดูสรุปจำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์');
+  showPanelDesc('เลือกประเภทลานจอดเพื่อดูสรุปแผนก สติ๊กเกอร์ รถ และชื่อเจ้าของ');
   els.btnGrid.innerHTML = '';
   els.summary.classList.add('hidden');
 
@@ -685,12 +688,14 @@ function escapeHtml(s) {
     .replaceAll('"', '&quot;');
 }
 
-function vehicleCardsHtml(vehicles, { showOwner = false } = {}) {
+function vehicleCardsHtml(vehicles, { showOwner = false, showDepartment = false } = {}) {
   if (!vehicles?.length) return '<p class="empty">ไม่มีรายการรถ</p>';
   return `<div class="vehicle-list">${vehicles
     .map((v, idx) => {
       const stickerClass = v.hasSticker === 'มีสติ๊กเกอร์' ? 'yes' : 'no';
       const owner = v.employee && v.employee !== '-' ? v.employee : 'ไม่ระบุเจ้าของ';
+      const dept =
+        v.department && v.department !== '-' ? escapeHtml(v.department) : 'ไม่ระบุแผนก';
       return `<button type="button" class="vehicle-card${showOwner ? ' open' : ''}" data-idx="${idx}">
         <div class="vc-top">
           <strong class="vc-plate">${escapeHtml(v.plate)}</strong>
@@ -700,6 +705,7 @@ function vehicleCardsHtml(vehicles, { showOwner = false } = {}) {
           <span>${escapeHtml(displayVehicleType(v.vehicleType))}</span>
           <span>${escapeHtml(v.brand)}</span>
           <span>${escapeHtml(v.vehicleColor)}</span>
+          ${showDepartment ? `<span>แผนก: ${dept}</span>` : ''}
         </div>
         <div class="vc-owner">เจ้าของรถ: <strong>${escapeHtml(owner)}</strong></div>
         <div class="vc-hint">${showOwner ? '' : 'คลิกเพื่อดูชื่อเจ้าของรถ'}</div>
@@ -717,6 +723,27 @@ function bindVehicleCards(root, { showOwner = false } = {}) {
   });
 }
 
+function departmentSummaryHtml(byDepartment, total) {
+  if (!byDepartment?.length) return '<p class="empty">ไม่มีข้อมูลแผนก</p>';
+  const max = Math.max(...byDepartment.map((r) => r.count), 1);
+  return `<div class="dept-summary">
+    <h3 class="section-title">สรุปตามแผนก</h3>
+    <div class="dept-summary-list">
+      ${byDepartment
+        .map((d) => {
+          const pct = total ? Math.round((d.count / total) * 100) : 0;
+          const width = Math.round((d.count / max) * 100);
+          return `<button type="button" class="dept-summary-row" data-department="${escapeHtml(d.name)}">
+            <span class="dept-summary-name">${escapeHtml(d.name)}</span>
+            <strong>${d.count.toLocaleString('th-TH')} คัน (${pct}%)</strong>
+            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
+          </button>`;
+        })
+        .join('')}
+    </div>
+  </div>`;
+}
+
 function renderSummary() {
   clearHomeNav();
   document.querySelector('.panel-head')?.classList.remove('banner');
@@ -732,15 +759,20 @@ function renderSummary() {
   if (filters.parkingStatus === 'none') titleParts.push('ไม่มีสติ๊กเกอร์');
 
   const isDept = Boolean(filters.department);
-  const showOwnerAlways = Boolean(filters.vehicleType || filters.parkingStatus || filters.brand);
-  const showVehicleCards = isDept || showOwnerAlways;
+  const isLot = Boolean(filters.parkingLot);
+  const showOwnerAlways = Boolean(
+    isLot || filters.vehicleType || filters.parkingStatus || filters.brand,
+  );
+  const showVehicleCards = isDept || isLot || showOwnerAlways;
 
   els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
-  showPanelDesc(
-    isDept
-      ? 'รถของแผนกนี้ · คลิกการ์ดรถหรือดูสติ๊กเกอร์เพื่อดูชื่อเจ้าของรถ'
-      : 'จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime',
-  );
+  if (isLot) {
+    showPanelDesc('สรุปแผนกที่ใช้ลานนี้ · สติ๊กเกอร์ · รถ และชื่อเจ้าของรถ');
+  } else if (isDept) {
+    showPanelDesc('รถของแผนกนี้ · คลิกการ์ดรถหรือดูสติ๊กเกอร์เพื่อดูชื่อเจ้าของรถ');
+  } else {
+    showPanelDesc('จำนวนรถ สีรถ ยี่ห้อรถ และสีสติ๊กเกอร์ จากข้อมูล realtime');
+  }
   els.btnGrid.innerHTML = '';
   els.summary.classList.remove('hidden');
 
@@ -754,9 +786,12 @@ function renderSummary() {
   const carCount = s.vehicles?.filter((v) => v.vehicleType === 'รถยนต์').length ?? 0;
   const bikeCount = s.vehicles?.filter((v) => v.vehicleType === 'มอร์เตอร์ไซต์').length ?? 0;
 
-  let deptFilters = '';
-  if (isDept && !filters.parkingStatus && !filters.vehicleType) {
-    deptFilters = `
+  let quickFilters = '';
+  if (
+    (isDept && !filters.parkingStatus && !filters.vehicleType) ||
+    (isLot && !filters.parkingStatus && !filters.vehicleType && !filters.department)
+  ) {
+    quickFilters = `
       <div class="dept-filters">
         <button type="button" class="mini-kpi mini-teal" data-filter="type" data-value="รถยนต์">
           <strong>${carCount.toLocaleString('th-TH')}</strong><span>รถยนต์</span>
@@ -772,6 +807,11 @@ function renderSummary() {
         </button>
       </div>`;
   }
+
+  const deptBlock =
+    isLot && !filters.department
+      ? departmentSummaryHtml(s.byDepartment, s.total)
+      : '';
 
   const rows = (s.vehicles || [])
     .map(
@@ -795,15 +835,24 @@ function renderSummary() {
         <div class="big">${s.total.toLocaleString('th-TH')}</div>
         <div class="caption">จำนวนรถ</div>
       </div>
+      <div class="summary-hero-side">
+        <div><span>มีสติ๊กเกอร์</span><strong>${stickerHas.toLocaleString('th-TH')}</strong></div>
+        <div><span>ไม่มีสติ๊กเกอร์</span><strong>${stickerNone.toLocaleString('th-TH')}</strong></div>
+      </div>
     </div>
-    ${deptFilters}
+    ${quickFilters}
+    ${deptBlock}
     ${
       showVehicleCards
-        ? `<h3 class="section-title">รายการรถ${showOwnerAlways ? ' · มีชื่อเจ้าของรถ' : ' · คลิกการ์ดเพื่อดูเจ้าของ'}</h3>
-           ${vehicleCardsHtml(s.vehicles, { showOwner: showOwnerAlways })}`
+        ? `<h3 class="section-title">รายการรถ · ชื่อเจ้าของรถ</h3>
+           ${vehicleCardsHtml(s.vehicles, {
+             showOwner: true,
+             showDepartment: isLot,
+           })}`
         : ''
     }
     <div class="buckets">
+      ${!isLot || filters.department ? bucketHtml('แผนก', s.byDepartment, s.total) : ''}
       ${bucketHtml('ยี่ห้อรถ', s.byBrand, s.total)}
       ${bucketHtml('สีรถ', s.byVehicleColor, s.total)}
       ${bucketHtml('สีสติ๊กเกอร์', s.byStickerColor, s.total)}
@@ -829,17 +878,30 @@ function renderSummary() {
     </div>
   `;
 
-  bindVehicleCards(els.summary, { showOwner: showOwnerAlways });
+  bindVehicleCards(els.summary, { showOwner: true });
 
   els.summary.querySelectorAll('.mini-kpi').forEach((btn) => {
     btn.addEventListener('click', () => {
       const kind = btn.dataset.filter;
       const value = btn.dataset.value;
+      const base = {
+        department: filters.department || undefined,
+        parkingLot: filters.parkingLot || undefined,
+      };
       if (kind === 'sticker') {
-        openSummary({ department: filters.department, parkingStatus: value });
+        openSummary({ ...base, parkingStatus: value });
       } else if (kind === 'type') {
-        openSummary({ department: filters.department, vehicleType: value });
+        openSummary({ ...base, vehicleType: value });
       }
+    });
+  });
+
+  els.summary.querySelectorAll('.dept-summary-row').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      openSummary({
+        parkingLot: filters.parkingLot,
+        department: btn.dataset.department,
+      });
     });
   });
 
