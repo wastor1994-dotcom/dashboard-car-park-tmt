@@ -740,9 +740,8 @@ function renderSummary() {
   if (filters.parkingStatus === 'none') titleParts.push('ไม่มีสติ๊กเกอร์');
 
   const isDept = Boolean(filters.department);
-  const showOwnerAlways = Boolean(
-    filters.department || filters.vehicleType || filters.parkingStatus || filters.brand,
-  );
+  const showOwnerAlways = Boolean(filters.vehicleType || filters.parkingStatus || filters.brand);
+  const showVehicleCards = isDept || showOwnerAlways;
 
   els.panelTitle.textContent = `สรุป — ${titleParts.join(' / ') || 'รถทั้งหมด'}`;
   showPanelDesc(
@@ -807,8 +806,8 @@ function renderSummary() {
     </div>
     ${deptFilters}
     ${
-      isDept || showOwnerAlways
-        ? `<h3 class="section-title">รายการรถ${showOwnerAlways ? ' · มีชื่อเจ้าของรถ' : ''}</h3>
+      showVehicleCards
+        ? `<h3 class="section-title">รายการรถ${showOwnerAlways ? ' · มีชื่อเจ้าของรถ' : ' · คลิกการ์ดเพื่อดูเจ้าของ'}</h3>
            ${vehicleCardsHtml(s.vehicles, { showOwner: showOwnerAlways })}`
         : ''
     }
