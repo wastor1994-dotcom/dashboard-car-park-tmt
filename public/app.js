@@ -360,14 +360,6 @@ function renderHome() {
   );
   els.btnGrid.appendChild(
     kpiCard({
-      label: 'ไม่ระบุประเภท',
-      count: typeCount('ไม่มีประเภทรถ'),
-      tone: 'gray',
-      onClick: () => openSummary({ vehicleType: 'ไม่มีประเภทรถ' }),
-    }),
-  );
-  els.btnGrid.appendChild(
-    kpiCard({
       label: 'มีสติ๊กเกอร์',
       count: parkingCount('has'),
       tone: 'green',

@@ -129,7 +129,7 @@ function countMap(items, keyFn) {
 }
 
 function buildMeta(records) {
-  const vehicleTypes = ['รถยนต์', 'มอร์เตอร์ไซต์', 'ไม่มีประเภทรถ'];
+  const vehicleTypes = ['รถยนต์', 'มอร์เตอร์ไซต์'];
   const brandsByType = {};
   for (const vt of vehicleTypes) {
     const subset = records.filter((r) => r.vehicleType === vt);
@@ -243,6 +243,13 @@ function resolveColumns(headerRow) {
   return { cols, detected };
 }
 
+function isMissingPlate(plate) {
+  const t = String(plate || '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+  return !t || t === '-' || t === 'n/a' || t === 'na' || t === 'ไม่มี' || t === 'ไม่มีทะเบียน';
+}
+
 function rowsToRecords(rows) {
   const header = rows[0] || [];
   const { cols, detected } = resolveColumns(header);
@@ -257,12 +264,19 @@ function rowsToRecords(rows) {
     const parkingLot = cell(row, cols.parkingLot);
     if (!plate && !parkingLot) continue;
 
+    // ตัดรถที่ไม่มีทะเบียน
+    if (isMissingPlate(plate)) continue;
+
+    const vehicleType = normalizeType(cell(row, cols.vehicleType));
+    // ตัดรถที่ไม่ระบุประเภท
+    if (vehicleType === 'ไม่มีประเภทรถ') continue;
+
     records.push({
       id: i + 1,
       parkingLot: parkingLot || 'ไม่ระบุลานจอด',
-      plate: plate || '-',
+      plate,
       brand: cell(row, cols.brand) || 'ไม่ระบุยี่ห้อ',
-      vehicleType: normalizeType(cell(row, cols.vehicleType)),
+      vehicleType,
       hasSticker: normalizeSticker(cell(row, cols.hasSticker)),
       vehicleColor: cell(row, cols.vehicleColor) || 'ไม่ระบุสี',
       stickerColor: cell(row, cols.stickerColor) || '-',
@@ -271,6 +285,9 @@ function rowsToRecords(rows) {
       department: cell(row, cols.department) || '-',
     });
   }
+
+  return { records, header, detected, cols };
+}
 
   return { records, header, detected, cols };
 }
