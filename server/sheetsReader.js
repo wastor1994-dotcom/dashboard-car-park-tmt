@@ -289,9 +289,6 @@ function rowsToRecords(rows) {
   return { records, header, detected, cols };
 }
 
-  return { records, header, detected, cols };
-}
-
 function fingerprint(records) {
   // cheap change detector for SSE broadcast gating
   return `${records.length}:${records.map((r) => `${r.plate}|${r.parkingLot}|${r.brand}|${r.stickerColor}`).join(';')}`;
